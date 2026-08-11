@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ajuste polinomial de curvas · Bishop §1.1</title>
+<style>
+  :root{
+    --ink:#10131F;
+    --ink-soft:#4A5068;
+    --page:#E7E9F0;
+    --panel:#FFFFFF;
+    --line:#CFD3E0;
+    --screen:#FBFBFE;
+    --grid:rgba(16,19,31,.075);
+    --train:#1D4ED8;
+    --valid:#B45309;
+    --fit:#D1105A;
+    --true:#0E8F6E;
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--page);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-text-size-adjust:100%;
+    padding:clamp(14px,3vw,32px) clamp(12px,3vw,28px) 48px;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+
+  header{margin-bottom:clamp(16px,2.5vw,26px)}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);display:flex;gap:.6em;flex-wrap:wrap;align-items:center;
+  }
+  .eyebrow span{opacity:.55}
+  h1{
+    font-family:var(--serif);font-weight:600;font-size:clamp(28px,5.4vw,46px);
+    line-height:1.05;margin:.28em 0 .18em;letter-spacing:-.015em;
+  }
+  .lede{max-width:60ch;font-size:clamp(14px,1.6vw,16px);line-height:1.5;color:var(--ink-soft);margin:0}
+  .lede em{font-style:normal;color:var(--ink);border-bottom:1.5px solid var(--fit);padding-bottom:1px}
+
+  .grid{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(272px,.86fr);gap:16px;align-items:start}
+  @media (max-width:920px){ .grid{grid-template-columns:1fr} }
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  .panel.screen{background:var(--screen);overflow:hidden;padding:6px}
+  canvas{display:block;width:100%;height:auto;touch-action:pan-y}
+
+  .pad{padding:16px 16px 18px}
+  .ctl{margin-bottom:18px}
+  .ctl:last-child{margin-bottom:0}
+  .ctl-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:7px}
+  .ctl-head label{font-size:13px;font-weight:600;letter-spacing:.01em}
+  .val{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);text-align:right}
+  .val b{color:var(--ink);font-weight:600}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.35}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;margin:0;display:block;
+  }
+  input[type=range]:focus{outline:none}
+  input[type=range]:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:6px}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line);border-radius:99px}
+  input[type=range]::-moz-range-track{height:4px;background:var(--line);border-radius:99px}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--ink);border:4px solid #fff;box-shadow:0 0 0 1px var(--ink);margin-top:-9px;cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--ink);border:4px solid #fff;
+    box-shadow:0 0 0 1px var(--ink);cursor:pointer;
+  }
+
+  .divider{height:1px;background:var(--line);margin:18px -16px}
+
+  .toggles{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;
+    padding:7px 11px;border-radius:99px;font-size:12.5px;cursor:pointer;user-select:none;
+    transition:background .15s,border-color .15s,opacity .15s;
+  }
+  .chip input{position:absolute;opacity:0;width:1px;height:1px}
+  .chip .dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+  .chip.sq .dot{border-radius:2px;transform:rotate(45deg)}
+  .chip.ln .dot{width:14px;height:0;border-top:2px dashed currentColor;border-radius:0}
+  .chip.ln.solid .dot{border-top:3px solid currentColor}
+  .chip[data-on="0"]{opacity:.42;background:#F3F4F8}
+  .chip:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .metric .k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-family:var(--mono)}
+  .metric .n{font-family:var(--mono);font-size:clamp(19px,2.4vw,23px);font-weight:600;letter-spacing:-.02em;margin-top:2px}
+  .bar{height:5px;background:#EDEFF4;border-radius:99px;margin-top:7px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;transition:width .25s ease}
+
+  button.ghost{
+    font-family:var(--sans);font-size:12.5px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:9px 13px;border-radius:9px;cursor:pointer;transition:background .15s;
+  }
+  button.ghost:hover{background:#F3F4F8}
+  button.ghost:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  details{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  summary{font-size:12.5px;cursor:pointer;color:var(--ink-soft);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+ ";font-family:var(--mono)}
+  details[open] summary::before{content:"– "}
+  .coefs{font-family:var(--mono);font-size:12px;line-height:1.75;margin-top:10px;max-height:210px;overflow:auto}
+  .coefs div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted var(--line)}
+  .coefs span:last-child{color:var(--ink-soft)}
+
+  .bottom{margin-top:16px}
+  .bottom .pad{padding-bottom:8px}
+  .sect-title{font-family:var(--serif);font-size:17px;margin:0 0 2px}
+  .sect-sub{font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;max-width:70ch;line-height:1.45}
+  footer{margin-top:22px;font-size:12px;color:var(--ink-soft);font-family:var(--mono);letter-spacing:.02em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Bishop <span>·</span> Pattern Recognition and Machine Learning <span>·</span> §1.1</div>
+    <h1>Ajuste polinomial de curvas</h1>
+    <p class="lede">Cien observaciones generadas desde <b>sin(2&pi;x)</b> más ruido gaussiano. Mueve los tres controles y observa cuándo el polinomio aprende <em>la señal</em> y cuándo aprende <em>el ruido</em>.</p>
+  </header>
+
+  <div class="grid">
+
+    <div class="panel screen">
+      <canvas id="plot" aria-label="Gráfico del ajuste polinomial"></canvas>
+    </div>
+
+    <div class="panel pad">
+
+      <div class="ctl">
+        <div class="ctl-head">
+          <label for="sN">Datos de entrenamiento</label>
+          <div class="val" id="vN"><b>10</b> / 90</div>
+        </div>
+        <input type="range" id="sN" min="2" max="98" step="1" value="10">
+        <div class="hint">El resto de los 100 puntos queda para validación.</div>
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-head">
+          <label for="sM">Grado del polinomio &nbsp;M</label>
+          <div class="val">M = <b id="vM">3</b></div>
+        </div>
+        <input type="range" id="sM" min="0" max="12" step="1" value="3">
+        <div class="hint" id="hM">Cúbico: cuatro coeficientes.</div>
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-head">
+          <label for="sL">Regularización &nbsp;&lambda;</label>
+          <div class="val" id="vL">&lambda; = 0</div>
+        </div>
+        <input type="range" id="sL" min="-40" max="4" step="1" value="-40">
+        <div class="hint">Penaliza <span style="font-family:var(--mono)">&lambda;&#8725;2 &middot; ||w||²</span>. Al extremo izquierdo, sin regularización.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="toggles">
+        <label class="chip" style="color:var(--train)" data-on="1"><input type="checkbox" id="cTr" checked><span class="dot"></span><span style="color:var(--ink)">Entrenamiento</span></label>
+        <label class="chip sq" style="color:var(--valid)" data-on="1"><input type="checkbox" id="cVa" checked><span class="dot"></span><span style="color:var(--ink)">Validación</span></label>
+        <label class="chip ln solid" style="color:var(--fit)" data-on="1"><input type="checkbox" id="cFi" checked><span class="dot"></span><span style="color:var(--ink)">Ajuste</span></label>
+        <label class="chip ln" style="color:var(--true)" data-on="1"><input type="checkbox" id="cTu" checked><span class="dot"></span><span style="color:var(--ink)">sin(2&pi;x)</span></label>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="readout">
+        <div class="metric">
+          <div class="k">E<sub>RMS</sub> entren.</div>
+          <div class="n" id="eTr" style="color:var(--train)">0.000</div>
+          <div class="bar"><i id="bTr" style="background:var(--train);width:0%"></i></div>
+        </div>
+        <div class="metric">
+          <div class="k">E<sub>RMS</sub> valid.</div>
+          <div class="n" id="eVa" style="color:var(--valid)">0.000</div>
+          <div class="bar"><i id="bVa" style="background:var(--valid);width:0%"></i></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="bNew">Generar datos nuevos</button>
+        <button class="ghost" id="bReset">Volver al inicio</button>
+      </div>
+
+      <details>
+        <summary>Ver los coeficientes w</summary>
+        <div class="coefs" id="coefs"></div>
+      </details>
+
+    </div>
+  </div>
+
+  <div class="panel bottom">
+    <div class="pad">
+      <h2 class="sect-title">Error según el grado</h2>
+      <p class="sect-sub">E<sub>RMS</sub> recalculado para cada grado de 0 a 12, con la misma partición y el mismo &lambda;. La línea vertical marca el M que tienes elegido.</p>
+      <canvas id="curveM" aria-label="Error RMS en función del grado del polinomio"></canvas>
+    </div>
+  </div>
+
+  <footer>E<sub>RMS</sub> = &radic;(2E(w)/N) &nbsp;·&nbsp; ruido &sigma; = 0.25 &nbsp;·&nbsp; base 1, x, x², …, x<sup>M</sup></footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- utilidades numéricas ---------- */
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+function makeData(seed){
+  var rnd=mulberry32(seed), N=100, x=[], t=[], idx=[];
+  for(var i=0;i<N;i++){
+    var xi=rnd();
+    var u1=Math.max(rnd(),1e-12), u2=rnd();
+    var g=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+    x.push(xi); t.push(Math.sin(2*Math.PI*xi)+0.25*g); idx.push(i);
+  }
+  for(var k=N-1;k>0;k--){var j=Math.floor(rnd()*(k+1));var tmp=idx[k];idx[k]=idx[j];idx[j]=tmp;}
+  return {x:x,t:t,order:idx,N:N};
+}
+
+/* mínimos cuadrados regularizados por QR de Householder sobre [Phi ; sqrt(lambda) I] */
+function fitPoly(xs,ts,M,lambda){
+  var n=M+1, nt=xs.length, m=nt+n, i,j,k;
+  var A=new Array(m), b=new Float64Array(m);
+  for(i=0;i<nt;i++){
+    var row=new Float64Array(n), p=1;
+    for(j=0;j<n;j++){row[j]=p;p*=xs[i];}
+    A[i]=row; b[i]=ts[i];
+  }
+  var s=Math.sqrt(Math.max(lambda,0));
+  for(i=0;i<n;i++){var r=new Float64Array(n);r[i]=s;A[nt+i]=r;b[nt+i]=0;}
+
+  var v=new Float64Array(m);
+  for(k=0;k<n;k++){
+    var nrm=0;
+    for(i=k;i<m;i++) nrm+=A[i][k]*A[i][k];
+    nrm=Math.sqrt(nrm);
+    if(nrm<1e-300) continue;
+    var alpha=A[k][k]>=0?-nrm:nrm, vn=0;
+    for(i=k;i<m;i++) v[i]=A[i][k];
+    v[k]-=alpha;
+    for(i=k;i<m;i++) vn+=v[i]*v[i];
+    if(vn<1e-300) continue;
+    for(j=k;j<n;j++){
+      var d=0;
+      for(i=k;i<m;i++) d+=v[i]*A[i][j];
+      var f=2*d/vn;
+      for(i=k;i<m;i++) A[i][j]-=f*v[i];
+    }
+    var db=0;
+    for(i=k;i<m;i++) db+=v[i]*b[i];
+    var fb=2*db/vn;
+    for(i=k;i<m;i++) b[i]-=fb*v[i];
+  }
+  var scale=0;
+  for(k=0;k<n;k++) scale=Math.max(scale,Math.abs(A[k][k]));
+  var tol=1e-13*(scale||1), w=new Float64Array(n);
+  for(k=n-1;k>=0;k--){
+    if(Math.abs(A[k][k])<=tol){w[k]=0;continue;}
+    var sum=b[k];
+    for(j=k+1;j<n;j++) sum-=A[k][j]*w[j];
+    w[k]=sum/A[k][k];
+  }
+  return w;
+}
+
+function evalPoly(w,x){var y=0;for(var j=w.length-1;j>=0;j--) y=y*x+w[j];return y;}
+
+function rms(w,xs,ts){
+  if(!xs.length) return NaN;
+  var s=0;
+  for(var i=0;i<xs.length;i++){var e=evalPoly(w,xs[i])-ts[i];s+=e*e;}
+  return Math.sqrt(s/xs.length);
+}
+
+/* ---------- estado ---------- */
+
+var seed=20250811, data=makeData(seed);
+var st={n:10,M:3,lam:-40,tr:true,va:true,fi:true,tu:true};
+var SAMP=420;
+var curCurve=new Float64Array(SAMP), tgtCurve=new Float64Array(SAMP), animT=1, animId=null;
+var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function split(){
+  var xr=[],tr=[],xv=[],tv=[];
+  for(var i=0;i<data.N;i++){
+    var id=data.order[i];
+    if(i<st.n){xr.push(data.x[id]);tr.push(data.t[id]);}
+    else{xv.push(data.x[id]);tv.push(data.t[id]);}
+  }
+  return {xr:xr,tr:tr,xv:xv,tv:tv};
+}
+function lamValue(){ return st.lam<=-40 ? 0 : Math.exp(st.lam); }
+
+/* ---------- canvas ---------- */
+
+function setup(cv,ratio){
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  var w=Math.round(cv.getBoundingClientRect().width)||cv.parentElement.clientWidth;
+  var h=Math.round(w/ratio);
+  cv.style.height=h+"px";
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  var ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,w:w,h:h};
+}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+var plot=document.getElementById("plot"), curveM=document.getElementById("curveM");
+
+function drawPlot(){
+  var narrow=window.innerWidth<560;
+  var g=setup(plot,narrow?1.06:1.42), ctx=g.ctx;
+  var L=narrow?34:44, R=12, T=12, B=narrow?32:36;
+  var pw=g.w-L-R, ph=g.h-T-B;
+  var x0=-0.03,x1=1.03,y0=-1.85,y1=1.85;
+  var X=function(x){return L+(x-x0)/(x1-x0)*pw;};
+  var Y=function(y){return T+(y1-y)/(y1-y0)*ph;};
+
+  ctx.clearRect(0,0,g.w,g.h);
+  ctx.fillStyle=css("--screen"); ctx.fillRect(0,0,g.w,g.h);
+
+  /* rejilla */
+  ctx.strokeStyle=css("--grid"); ctx.lineWidth=1;
+  ctx.beginPath();
+  for(var gx=0;gx<=1.0001;gx+=0.1){ctx.moveTo(Math.round(X(gx))+.5,T);ctx.lineTo(Math.round(X(gx))+.5,T+ph);}
+  for(var gy=-1.5;gy<=1.51;gy+=0.5){ctx.moveTo(L,Math.round(Y(gy))+.5);ctx.lineTo(L+pw,Math.round(Y(gy))+.5);}
+  ctx.stroke();
+
+  /* ejes */
+  ctx.strokeStyle="rgba(16,19,31,.30)";
+  ctx.beginPath();
+  ctx.moveTo(L,Math.round(Y(0))+.5);ctx.lineTo(L+pw,Math.round(Y(0))+.5);
+  ctx.moveTo(Math.round(X(0))+.5,T);ctx.lineTo(Math.round(X(0))+.5,T+ph);
+  ctx.stroke();
+
+  ctx.fillStyle="#5A6178";
+  ctx.font=(narrow?10:11)+"px "+css("--mono");
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  [0,0.5,1].forEach(function(v){ctx.fillText(v.toFixed(1),X(v),T+ph+5);});
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  [-1,0,1].forEach(function(v){ctx.fillText(v.toFixed(0),L-7,Y(v));});
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  ctx.fillText("x",L+pw/2,T+ph+19);
+
+  var s=split();
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L,T,pw,ph); ctx.clip();
+
+  /* curva verdadera */
+  if(st.tu){
+    ctx.strokeStyle=css("--true"); ctx.lineWidth=2; ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    for(var i=0;i<=200;i++){var xx=i/200, yy=Math.sin(2*Math.PI*xx);i?ctx.lineTo(X(xx),Y(yy)):ctx.moveTo(X(xx),Y(yy));}
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  /* puntos */
+  function circle(cx,cy,r){ctx.beginPath();ctx.arc(cx,cy,r,0,6.2832);}
+  function diamond(cx,cy,r){ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx+r,cy);ctx.lineTo(cx,cy+r);ctx.lineTo(cx-r,cy);ctx.closePath();}
+  var rP=narrow?3.6:4.4;
+
+  if(st.va){
+    ctx.strokeStyle=css("--valid"); ctx.fillStyle="rgba(180,83,9,.14)"; ctx.lineWidth=1.5;
+    for(var v=0;v<s.xv.length;v++){diamond(X(s.xv[v]),Y(s.tv[v]),rP);ctx.fill();ctx.stroke();}
+  }
+  if(st.tr){
+    ctx.strokeStyle=css("--train"); ctx.fillStyle="rgba(29,78,216,.14)"; ctx.lineWidth=1.8;
+    for(var r2=0;r2<s.xr.length;r2++){circle(X(s.xr[r2]),Y(s.tr[r2]),rP);ctx.fill();ctx.stroke();}
+  }
+
+  /* ajuste */
+  if(st.fi){
+    ctx.strokeStyle=css("--fit"); ctx.lineWidth=narrow?2.4:2.8;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath();
+    var started=false;
+    for(var k=0;k<SAMP;k++){
+      var xv2=k/(SAMP-1), yv=curCurve[k];
+      if(!isFinite(yv)){started=false;continue;}
+      yv=Math.max(-40,Math.min(40,yv));
+      if(!started){ctx.moveTo(X(xv2),Y(yv));started=true;} else ctx.lineTo(X(xv2),Y(yv));
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCurveM(){
+  var narrow=window.innerWidth<560;
+  var g=setup(curveM,narrow?1.5:3.6), ctx=g.ctx;
+  var L=42,R=14,T=12,B=30, pw=g.w-L-R, ph=g.h-T-B;
+  ctx.clearRect(0,0,g.w,g.h);
+
+  var s=split(), lam=lamValue(), MM=12;
+  var er=[],ev=[],maxv=0.35;
+  for(var M=0;M<=MM;M++){
+    var w=fitPoly(s.xr,s.tr,M,lam);
+    var a=rms(w,s.xr,s.tr), b=rms(w,s.xv,s.tv);
+    er.push(a); ev.push(b);
+    if(isFinite(a)) maxv=Math.max(maxv,a);
+    if(isFinite(b)) maxv=Math.max(maxv,Math.min(b,1.5));
+  }
+  maxv=Math.min(maxv*1.12,2.2);
+
+  var X=function(M){return L+(M/MM)*pw;};
+  var Y=function(e){return T+ph-Math.max(0,Math.min(e,maxv))/maxv*ph;};
+
+  ctx.strokeStyle="#E4E7EF"; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(var m2=0;m2<=MM;m2++){ctx.moveTo(Math.round(X(m2))+.5,T);ctx.lineTo(Math.round(X(m2))+.5,T+ph);}
+  ctx.stroke();
+  ctx.strokeStyle="#CFD3E0";
+  ctx.beginPath();ctx.moveTo(L,Math.round(T+ph)+.5);ctx.lineTo(L+pw,Math.round(T+ph)+.5);ctx.stroke();
+
+  /* marcador del M actual */
+  ctx.fillStyle="rgba(16,19,31,.06)";
+  ctx.fillRect(X(st.M)-((pw/MM)/2),T,pw/MM,ph);
+  ctx.strokeStyle="rgba(16,19,31,.45)"; ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(Math.round(X(st.M))+.5,T);ctx.lineTo(Math.round(X(st.M))+.5,T+ph);ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle="#4A5068"; ctx.font="11px "+css("--mono");
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(var m3=0;m3<=MM;m3+=(narrow?2:1)) ctx.fillText(m3,X(m3),T+ph+7);
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  ctx.fillText(maxv.toFixed(1),L-8,T);
+  ctx.fillText("0",L-8,T+ph);
+  ctx.save();ctx.translate(13,T+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("E RMS",0,0);ctx.restore();
+
+  function line(arr,color){
+    ctx.strokeStyle=color; ctx.lineWidth=2.2; ctx.lineJoin="round"; ctx.beginPath();
+    for(var i=0;i<arr.length;i++){var y=isFinite(arr[i])?arr[i]:maxv*2;i?ctx.lineTo(X(i),Y(y)):ctx.moveTo(X(i),Y(y));}
+    ctx.stroke();
+    ctx.fillStyle=color;
+    for(var j=0;j<arr.length;j++){var y2=isFinite(arr[j])?arr[j]:maxv*2;ctx.beginPath();ctx.arc(X(j),Y(y2),3,0,6.2832);ctx.fill();}
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(L,T-4,pw,ph+4); ctx.clip();
+  line(ev,css("--valid")); line(er,css("--train"));
+  ctx.restore();
+}
+
+/* ---------- actualización ---------- */
+
+function fmt(v){
+  if(!isFinite(v)) return "—";
+  if(Math.abs(v)>=1000) return v.toExponential(1);
+  return v.toFixed(3);
+}
+
+function update(animate){
+  var s=split(), lam=lamValue();
+  var w=fitPoly(s.xr,s.tr,st.M,lam);
+
+  for(var k=0;k<SAMP;k++) tgtCurve[k]=evalPoly(w,k/(SAMP-1));
+  if(animate&&!reduce){
+    animT=0;
+    if(!animId) animId=requestAnimationFrame(step);
+  }else{
+    curCurve.set(tgtCurve); animT=1; drawPlot();
+  }
+
+  var a=rms(w,s.xr,s.tr), b=rms(w,s.xv,s.tv);
+  document.getElementById("eTr").textContent=fmt(a);
+  document.getElementById("eVa").textContent=fmt(b);
+  var top=Math.max(0.6,Math.min(1.2,Math.max(isFinite(a)?a:0,isFinite(b)?b:0)));
+  document.getElementById("bTr").style.width=Math.min(100,(a/top)*100)+"%";
+  document.getElementById("bVa").style.width=Math.min(100,(b/top)*100)+"%";
+
+  var html="";
+  for(var j=0;j<w.length;j++){
+    var val=w[j], txt=Math.abs(val)>=1e4||(Math.abs(val)<1e-3&&val!==0)?val.toExponential(2):val.toFixed(3);
+    html+="<div><span>w"+j+"</span><span>"+txt+"</span></div>";
+  }
+  document.getElementById("coefs").innerHTML=html;
+
+  drawCurveM();
+}
+
+function step(){
+  animT=Math.min(1,animT+0.11);
+  var e=1-Math.pow(1-animT,3);
+  for(var k=0;k<SAMP;k++){
+    var a=curCurve[k], b=tgtCurve[k];
+    curCurve[k]=(isFinite(a)&&isFinite(b))?a+(b-a)*e:b;
+  }
+  if(animT>=1){ curCurve.set(tgtCurve); animId=null; drawPlot(); return; }
+  drawPlot();
+  animId=requestAnimationFrame(step);
+}
+
+/* ---------- controles ---------- */
+
+var sN=document.getElementById("sN"), sM=document.getElementById("sM"), sL=document.getElementById("sL");
+
+function labels(){
+  document.getElementById("vN").innerHTML="<b>"+st.n+"</b> / "+(100-st.n);
+  document.getElementById("vM").textContent=st.M;
+  var names={0:"Constante: una sola altura.",1:"Recta.",2:"Parábola.",3:"Cúbico: cuatro coeficientes."};
+  document.getElementById("hM").textContent=names[st.M]||("Polinomio de grado "+st.M+": "+(st.M+1)+" coeficientes.");
+  var lam=lamValue();
+  document.getElementById("vL").innerHTML = st.lam<=-40
+    ? "&lambda; = 0"
+    : "ln&nbsp;&lambda; = "+st.lam+" &nbsp;·&nbsp; &lambda; = "+lam.toExponential(1).replace("e","e");
+}
+
+sN.addEventListener("input",function(){st.n=+sN.value;labels();update(false);});
+sM.addEventListener("input",function(){st.M=+sM.value;labels();update(true);});
+sL.addEventListener("input",function(){st.lam=+sL.value;labels();update(true);});
+
+[["cTr","tr"],["cVa","va"],["cFi","fi"],["cTu","tu"]].forEach(function(p){
+  var el=document.getElementById(p[0]);
+  el.addEventListener("change",function(){
+    st[p[1]]=el.checked;
+    el.closest(".chip").setAttribute("data-on",el.checked?"1":"0");
+    drawPlot();
+  });
+});
+
+document.getElementById("bNew").addEventListener("click",function(){
+  seed=(Math.random()*1e9)|0; data=makeData(seed); update(true);
+});
+document.getElementById("bReset").addEventListener("click",function(){
+  st.n=10;st.M=3;st.lam=-40;
+  sN.value=10;sM.value=3;sL.value=-40;
+  labels();update(true);
+});
+
+var rt;
+window.addEventListener("resize",function(){clearTimeout(rt);rt=setTimeout(function(){drawPlot();drawCurveM();},120);});
+
+labels(); update(false);
+})();
+</script>
+</body>
+</html>
