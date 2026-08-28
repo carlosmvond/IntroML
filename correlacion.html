@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Correlación: explorando r con distintos conjuntos de datos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light only;
+    --bg: #f6f3ea;
+    --surface: #ffffff;
+    --surface-2: #fbf9f3;
+    --border: #ddd5c2;
+    --ink: #202a20;
+    --ink-soft: #5c6459;
+    --accent: #2f6f52;
+    --accent-soft: #e4efe7;
+    --accent-2: #cf6b3d;
+    --accent-2-soft: #fbe9dd;
+    --radius: 14px;
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-body);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body{
+    padding: 20px 16px 48px;
+  }
+
+  .wrap{
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  header{
+    margin-bottom: 22px;
+  }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+
+  h1{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(24px, 5vw, 34px);
+    line-height: 1.15;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+
+  .subtitle{
+    font-size: 15px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin: 0;
+    max-width: 62ch;
+  }
+
+  /* dataset picker */
+  .picker{
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 2px 10px;
+    margin: 22px 0 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .picker::-webkit-scrollbar{ display:none; }
+
+  .picker-btn{
+    flex: 0 0 auto;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    padding: 10px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .picker-btn .tag{
+    display: block;
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .picker-btn.active{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .picker-btn.active .tag{ color: rgba(255,255,255,0.8); }
+
+  /* tabs */
+  .tabs{
+    display: flex;
+    gap: 6px;
+    border-bottom: 1.5px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .tab-btn{
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    border-bottom: 2.5px solid transparent;
+    padding: 10px 4px 12px;
+    margin-right: 18px;
+    cursor: pointer;
+  }
+
+  .tab-btn.active{
+    color: var(--ink);
+    border-bottom-color: var(--accent-2);
+  }
+
+  .tab-panel{ display: none; }
+  .tab-panel.active{ display: block; }
+
+  /* cards */
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+
+  .note{
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin: 10px 0 0;
+  }
+
+  /* explore tab layout */
+  .explore-grid{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  @media (min-width: 760px){
+    .explore-grid{ grid-template-columns: 1.15fr 1fr; align-items: start; }
+  }
+
+  .chart-card{ padding: 16px 14px 10px; }
+
+  .axis-caption-x{
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .chart-svg{ width: 100%; height: auto; display: block; }
+  .axis-line{ stroke: var(--ink-soft); stroke-width: 1.2; }
+  .tick-line{ stroke: var(--ink-soft); stroke-width: 1; opacity: 0.6; }
+  .tick-label{ font-family: var(--font-mono); font-size: 10.5px; fill: var(--ink-soft); }
+  .pt{ fill: var(--accent); fill-opacity: 0.78; stroke: var(--surface); stroke-width: 1.2; }
+  .pt-active{ fill: var(--accent-2); fill-opacity: 1; stroke: var(--ink); stroke-width: 1.5; }
+  .pt-pending{ fill: var(--ink-soft); fill-opacity: 0.22; stroke: none; }
+
+  .stat-r{
+    font-family: var(--font-mono);
+    font-size: 40px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label{
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+
+  .table-scroll{
+    overflow-x: auto;
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  table{
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+
+  th, td{
+    padding: 7px 10px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  th{
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  td{ border-bottom: 1px solid var(--border); }
+  tr:last-child td{ border-bottom: none; }
+  td:first-child, th:first-child{ text-align: left; color: var(--ink-soft); }
+
+  /* formula tab */
+  .formula-box{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    padding: 18px 4px;
+  }
+
+  .frac{
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: middle;
+  }
+
+  .frac-num, .frac-den{
+    padding: 3px 6px;
+    transition: background 0.25s ease, color 0.25s ease;
+    border-radius: 6px;
+  }
+
+  .frac-num{ border-bottom: 1.5px solid var(--ink); }
+
+  .frac.pulse .frac-num{ background: var(--accent-soft); color: var(--accent); }
+  .frac.pulse .frac-den{ background: var(--accent-2-soft); color: var(--accent-2); }
+
+  .means-line{
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin-bottom: 2px;
+  }
+
+  .means-line b{ color: var(--ink); font-weight: 600; }
+
+  .formula-grid{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  @media (min-width: 760px){
+    .formula-grid{ grid-template-columns: 0.85fr 1.15fr; align-items: start; }
+  }
+
+  .sums-box{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .sum-cell{
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  .sum-cell .k{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .sum-cell .v{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .r-reveal{
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    color: var(--accent);
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+
+  .r-reveal.show{ opacity: 1; transform: translateY(0); }
+
+  tr.row-pending td{ color: var(--ink-soft); opacity: 0.35; }
+  tr.row-active td{ background: var(--accent-2-soft); font-weight: 600; }
+  tr.row-active td:first-child{ color: var(--accent-2); }
+
+  .controls{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+
+  .ctrl-btn{
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .ctrl-btn.primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .ctrl-btn:disabled{ opacity: 0.4; cursor: not-allowed; }
+
+  footer{
+    margin-top: 30px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Ingeniería bioquímica · variables aleatorias</p>
+    <h1>¿Qué tan correlacionados están dos datos?</h1>
+    <p class="subtitle">Elegí un conjunto de datos y explorá el gráfico, la tabla, y cómo se arma el coeficiente de correlación de Pearson término por término.</p>
+  </header>
+
+  <nav class="picker" id="picker"></nav>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="explore" id="tabBtnExplore">Gráfico y datos</button>
+    <button class="tab-btn" data-tab="formula" id="tabBtnFormula">Fórmula paso a paso</button>
+  </div>
+
+  <section class="tab-panel active" id="panelExplore">
+    <div class="explore-grid">
+      <div class="card chart-card">
+        <div id="chartMainHolder"></div>
+        <div class="axis-caption-x">Variable X</div>
+      </div>
+      <div class="card">
+        <div class="stat-r" id="statR">0.00</div>
+        <div class="stat-label" id="statLabel">—</div>
+        <p class="note" id="statNote"></p>
+        <div class="table-scroll">
+          <table id="tableMain">
+            <thead>
+              <tr><th>i</th><th>x</th><th>y</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="panelFormula">
+    <div class="card">
+      <p class="means-line">Medias fijas, calculadas con los <span id="meanN"></span> puntos: <b>x̄ = <span id="meanX"></span></b> &nbsp; <b>ȳ = <span id="meanY"></span></b></p>
+
+      <div class="formula-box">
+        <span>r&nbsp;=</span>
+        <div class="frac" id="fracEl">
+          <div class="frac-num">Σ (x<sub>i</sub> − x̄)(y<sub>i</sub> − ȳ)</div>
+          <div class="frac-den">√Σ(x<sub>i</sub> − x̄)² · √Σ(y<sub>i</sub> − ȳ)²</div>
+        </div>
+      </div>
+
+      <div class="formula-grid">
+        <div>
+          <div id="chartMiniHolder"></div>
+          <p class="note" id="formulaNote"></p>
+        </div>
+        <div>
+          <div class="table-scroll">
+            <table id="tableFormula">
+              <thead>
+                <tr>
+                  <th>i</th><th>xᵢ</th><th>yᵢ</th>
+                  <th>xᵢ−x̄</th><th>yᵢ−ȳ</th>
+                  <th>producto</th><th>(xᵢ−x̄)²</th><th>(yᵢ−ȳ)²</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="sums-box">
+            <div class="sum-cell">
+              <span class="k">Σ producto</span>
+              <span class="v" id="sumNum">0.00</span>
+            </div>
+            <div class="sum-cell">
+              <span class="k">Σ (xᵢ−x̄)²</span>
+              <span class="v" id="sumDenX">0.00</span>
+            </div>
+            <div class="sum-cell">
+              <span class="k">Σ (yᵢ−ȳ)²</span>
+              <span class="v" id="sumDenY">0.00</span>
+            </div>
+          </div>
+
+          <div class="r-reveal" id="rReveal"></div>
+
+          <div class="controls">
+            <button class="ctrl-btn" id="btnReset">Reiniciar</button>
+            <button class="ctrl-btn" id="btnPrev">◀ Anterior</button>
+            <button class="ctrl-btn primary" id="btnPlay">▶ Reproducir</button>
+            <button class="ctrl-btn" id="btnNext">Siguiente ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Hecho para explorar independencia y correlación con datos reales de laboratorio.</footer>
+</div>
+
+<script>
+(function(){
+
+  var DATASETS = [
+    {
+      id: 'redonda',
+      label: 'Nube redonda',
+      tag: 'Sin correlación',
+      note: 'Independientes: nube dispersa, sin patrón — conocer X no ayuda a predecir Y.',
+      points: [[5.00,5.78],[5.48,5.57],[4.56,5.17],[3.58,3.51],[4.27,4.95],[3.41,6.11],[5.10,2.85],[7.14,4.27],[4.21,1.96],[4.01,2.94]]
+    },
+    {
+      id: 'elipse',
+      label: 'Elipse vertical',
+      tag: 'Correlación fuerte',
+      note: 'Fuerte relación lineal positiva: los puntos casi forman una recta creciente.',
+      points: [[3.18,0.26],[4.67,4.41],[3.77,1.21],[4.91,5.74],[5.48,5.95],[4.59,3.90],[3.23,-1.20],[4.93,3.65],[4.76,4.62],[5.04,6.09]]
+    },
+    {
+      id: 'parabola',
+      label: 'Parábola',
+      tag: 'r ≈ 0, dependientes',
+      note: 'Relación clara y predecible (Y ≈ X²), pero no lineal: la correlación de Pearson no la detecta.',
+      points: [[-2.89,8.40],[-2.51,6.18],[-1.66,2.79],[-0.91,0.53],[-0.36,-0.02],[0.44,0.14],[0.99,1.20],[1.77,3.42],[2.55,6.17],[2.90,8.21]]
+    }
+  ];
+
+  var state = { datasetIndex: 0, tab: 'explore', step: 0, playing: false, timer: null };
+
+  function fmt(n){ return n.toFixed(2); }
+
+  function computeStats(points){
+    var n = points.length;
+    var sumX = 0, sumY = 0, i;
+    for (i = 0; i < n; i++){ sumX += points[i][0]; sumY += points[i][1]; }
+    var meanX = sumX / n, meanY = sumY / n;
+    var rows = [], num = 0, denX = 0, denY = 0;
+    for (i = 0; i < n; i++){
+      var dx = points[i][0] - meanX;
+      var dy = points[i][1] - meanY;
+      var prod = dx * dy, sqx = dx * dx, sqy = dy * dy;
+      num += prod; denX += sqx; denY += sqy;
+      rows.push({ idx: i + 1, x: points[i][0], y: points[i][1], dx: dx, dy: dy, prod: prod, sqx: sqx, sqy: sqy });
+    }
+    var r = num / Math.sqrt(denX * denY);
+    return { n: n, meanX: meanX, meanY: meanY, rows: rows, num: num, denX: denX, denY: denY, r: r };
+  }
+
+  function interpretLabel(r){
+    var a = Math.abs(r);
+    if (a < 0.2) return 'Prácticamente sin correlación lineal';
+    if (a < 0.5) return 'Correlación lineal débil';
+    if (a < 0.8) return 'Correlación lineal moderada';
+    return 'Correlación lineal fuerte';
+  }
+
+  function makeScale(points, w, h, margin){
+    var xs = points.map(function(p){ return p[0]; });
+    var ys = points.map(function(p){ return p[1]; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var padX = (maxX - minX) * 0.18 || 1, padY = (maxY - minY) * 0.18 || 1;
+    minX -= padX; maxX += padX; minY -= padY; maxY += padY;
+    return {
+      sx: function(x){ return margin + (x - minX) / (maxX - minX) * (w - 2 * margin); },
+      sy: function(y){ return h - margin - (y - minY) / (maxY - minY) * (h - 2 * margin); },
+      minX: minX, maxX: maxX, minY: minY, maxY: maxY
+    };
+  }
+
+  function scatterSVG(points, opts){
+    opts = opts || {};
+    var w = opts.w || 400, h = opts.h || 340, margin = opts.margin || 40;
+    var activeIndex = (opts.activeIndex === undefined) ? -1 : opts.activeIndex;
+    var revealUpTo = (opts.revealUpTo === undefined) ? points.length : opts.revealUpTo;
+    var sc = makeScale(points, w, h, margin);
+    var s = '<svg viewBox="0 0 ' + w + ' ' + h + '" class="chart-svg" role="img" aria-label="Diagrama de dispersión de las dos variables">';
+
+    s += '<line x1="' + margin + '" y1="' + (h - margin) + '" x2="' + (w - margin) + '" y2="' + (h - margin) + '" class="axis-line"/>';
+    s += '<line x1="' + margin + '" y1="' + margin + '" x2="' + margin + '" y2="' + (h - margin) + '" class="axis-line"/>';
+
+    var i, val, px, py;
+    for (i = 0; i < 4; i++){
+      val = sc.minX + (sc.maxX - sc.minX) * i / 3;
+      px = sc.sx(val);
+      s += '<line x1="' + px + '" y1="' + (h - margin) + '" x2="' + px + '" y2="' + (h - margin + 6) + '" class="tick-line"/>';
+      s += '<text x="' + px + '" y="' + (h - margin + 18) + '" class="tick-label" text-anchor="middle">' + val.toFixed(1) + '</text>';
+    }
+    for (i = 0; i < 4; i++){
+      val = sc.minY + (sc.maxY - sc.minY) * i / 3;
+      py = sc.sy(val);
+      s += '<line x1="' + (margin - 6) + '" y1="' + py + '" x2="' + margin + '" y2="' + py + '" class="tick-line"/>';
+      s += '<text x="' + (margin - 10) + '" y="' + (py + 4) + '" class="tick-label" text-anchor="end">' + val.toFixed(1) + '</text>';
+    }
+
+    points.forEach(function(p, idx){
+      var cx = sc.sx(p[0]), cy = sc.sy(p[1]);
+      var cls = 'pt';
+      var r = 6.5;
+      if (idx >= revealUpTo){ cls = 'pt pt-pending'; }
+      if (idx === activeIndex){ cls = 'pt pt-active'; r = 9; }
+      s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" class="' + cls + '"/>';
+    });
+
+    s += '</svg>';
+    return s;
+  }
+
+  function renderPicker(){
+    var el = document.getElementById('picker');
+    el.innerHTML = '';
+    DATASETS.forEach(function(d, i){
+      var btn = document.createElement('button');
+      btn.className = 'picker-btn' + (i === state.datasetIndex ? ' active' : '');
+      btn.innerHTML = d.label + '<span class="tag">' + d.tag + '</span>';
+      btn.addEventListener('click', function(){
+        state.datasetIndex = i;
+        state.step = 0;
+        stopPlaying();
+        renderAll();
+      });
+      el.appendChild(btn);
+    });
+  }
+
+  function renderExplore(st){
+    document.getElementById('chartMainHolder').innerHTML = scatterSVG(currentDataset().points, { h: 340 });
+    document.getElementById('statR').textContent = fmt(st.r);
+    document.getElementById('statLabel').textContent = interpretLabel(st.r);
+    document.getElementById('statNote').textContent = currentDataset().note;
+
+    var tbody = document.querySelector('#tableMain tbody');
+    tbody.innerHTML = '';
+    st.rows.forEach(function(row){
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + row.idx + '</td><td>' + fmt(row.x) + '</td><td>' + fmt(row.y) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderFormula(st){
+    document.getElementById('meanN').textContent = st.n;
+    document.getElementById('meanX').textContent = fmt(st.meanX);
+    document.getElementById('meanY').textContent = fmt(st.meanY);
+    document.getElementById('formulaNote').textContent = currentDataset().note;
+
+    document.getElementById('chartMiniHolder').innerHTML = scatterSVG(currentDataset().points, {
+      h: 300,
+      activeIndex: state.step > 0 && state.step <= st.n ? state.step - 1 : -1,
+      revealUpTo: state.step
+    });
+
+    var tbody = document.querySelector('#tableFormula tbody');
+    tbody.innerHTML = '';
+    var partialNum = 0, partialDenX = 0, partialDenY = 0;
+
+    st.rows.forEach(function(row, idx){
+      var revealed = idx < state.step;
+      var isActive = idx === state.step - 1;
+      var tr = document.createElement('tr');
+      tr.className = revealed ? (isActive ? 'row-active' : '') : 'row-pending';
+
+      if (revealed){
+        tr.innerHTML =
+          '<td>' + row.idx + '</td>' +
+          '<td>' + fmt(row.x) + '</td>' +
+          '<td>' + fmt(row.y) + '</td>' +
+          '<td>' + fmt(row.dx) + '</td>' +
+          '<td>' + fmt(row.dy) + '</td>' +
+          '<td>' + fmt(row.prod) + '</td>' +
+          '<td>' + fmt(row.sqx) + '</td>' +
+          '<td>' + fmt(row.sqy) + '</td>';
+        partialNum += row.prod; partialDenX += row.sqx; partialDenY += row.sqy;
+      } else {
+        tr.innerHTML =
+          '<td>' + row.idx + '</td>' +
+          '<td>' + fmt(row.x) + '</td>' +
+          '<td>' + fmt(row.y) + '</td>' +
+          '<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>';
+      }
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('sumNum').textContent = fmt(partialNum);
+    document.getElementById('sumDenX').textContent = fmt(partialDenX);
+    document.getElementById('sumDenY').textContent = fmt(partialDenY);
+
+    var frac = document.getElementById('fracEl');
+    if (state.step > 0 && state.step < st.n){
+      frac.classList.add('pulse');
+    } else {
+      frac.classList.remove('pulse');
+    }
+
+    var reveal = document.getElementById('rReveal');
+    if (state.step >= st.n){
+      reveal.textContent = 'r = ' + fmt(partialNum) + ' / (√' + fmt(partialDenX) + ' · √' + fmt(partialDenY) + ') = ' + fmt(st.r);
+      reveal.classList.add('show');
+    } else {
+      reveal.classList.remove('show');
+    }
+
+    document.getElementById('btnPrev').disabled = state.step <= 0;
+    document.getElementById('btnNext').disabled = state.step >= st.n;
+  }
+
+  function currentDataset(){ return DATASETS[state.datasetIndex]; }
+
+  function renderAll(){
+    renderPicker();
+    var st = computeStats(currentDataset().points);
+    renderExplore(st);
+    renderFormula(st);
+  }
+
+  function switchTab(tab){
+    state.tab = tab;
+    document.getElementById('tabBtnExplore').classList.toggle('active', tab === 'explore');
+    document.getElementById('tabBtnFormula').classList.toggle('active', tab === 'formula');
+    document.getElementById('panelExplore').classList.toggle('active', tab === 'explore');
+    document.getElementById('panelFormula').classList.toggle('active', tab === 'formula');
+  }
+
+  function stopPlaying(){
+    state.playing = false;
+    if (state.timer){ clearInterval(state.timer); state.timer = null; }
+    document.getElementById('btnPlay').textContent = '▶ Reproducir';
+  }
+
+  document.getElementById('tabBtnExplore').addEventListener('click', function(){ switchTab('explore'); });
+  document.getElementById('tabBtnFormula').addEventListener('click', function(){ switchTab('formula'); });
+
+  document.getElementById('btnReset').addEventListener('click', function(){
+    stopPlaying();
+    state.step = 0;
+    renderFormula(computeStats(currentDataset().points));
+  });
+
+  document.getElementById('btnPrev').addEventListener('click', function(){
+    stopPlaying();
+    var n = currentDataset().points.length;
+    state.step = Math.max(0, state.step - 1);
+    renderFormula(computeStats(currentDataset().points));
+  });
+
+  document.getElementById('btnNext').addEventListener('click', function(){
+    stopPlaying();
+    var n = currentDataset().points.length;
+    state.step = Math.min(n, state.step + 1);
+    renderFormula(computeStats(currentDataset().points));
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', function(){
+    var n = currentDataset().points.length;
+    if (state.playing){
+      stopPlaying();
+      return;
+    }
+    if (state.step >= n){ state.step = 0; }
+    state.playing = true;
+    document.getElementById('btnPlay').textContent = '⏸ Pausar';
+    state.timer = setInterval(function(){
+      state.step += 1;
+      renderFormula(computeStats(currentDataset().points));
+      if (state.step >= n){ stopPlaying(); }
+    }, 900);
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
